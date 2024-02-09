@@ -149,3 +149,105 @@ export function createNewParticipant(name: string): Result<Participant, string> 
         return Result.Err<Participant, string>(`Failed to create a new participant: ${err}`);
     }
 }
+
+
+// Updating an Existing Participant
+$update
+export function updateExistingParticipant(id: string, name: string): Result<Participant,string> {
+    return match(participantStorage.get(id), {
+        Some: (participant) => {
+            const  updatedParticipant: Participant = {...participant, name};
+            participantStorage.insert(participant.id, updatedParticipant);
+            return Result.Ok<Participant, string>(updatedParticipant)
+        },
+        None: ()=> Result.Err<Participant, string>(`No participant with ID "${id}" exists.`),
+    });
+}
+
+
+// Delete an existing particpant
+$update
+export function deleteParticipant(id: string): Result<Participant, string> {
+    return match(participantStorage.get(id),{
+        Some: (participant) => {
+            participantStorage.remove(id);
+            return Result.Ok<Participant, string>(participant)
+        },
+        None: () => Result.Err<Participant, string>(`Unable to find participant with ID "${id}".`),
+    });
+}   
+
+// Get a participant by id
+$query
+export function getParticipantById(id: string): Result<Participant, string> {
+    return match(participantStorage.get(id), {
+        Some: (participant) => {
+            return Result.Ok<Participant, string>(participant)
+        },
+        None: () => Result.Err<Participant, string>("The requested participant does not exist."),
+    });
+}
+
+
+// Get all the participants
+$query
+export  function getAllParticipants(): Vec<Participant> {
+    const participants = participantStorage.values();
+    return participants;
+}
+
+// Insert a participant into an activity
+$update
+export function insertIntoActivity(activityId: string, participantId: string): Result<Activity, string> {
+    return match(activityStorage.get(activityId), {
+        Some: (activity) => {
+            return match(participantStorage.get(participantId), {
+                Some: (participantData) => {
+                    const updateActivity: Activity = {
+                        ...activity,
+                        participants: [...activity.participants, participantData],
+                        updatedAt: Opt.Some(ic.time()),
+                    };
+                    activityStorage.insert(activity.id, updateActivity);
+                    return Result.Ok<Activity, string>(updateActivity);
+                },
+                None: () => Result.Err<Activity, string>(`No participant found with the id "${participantId}"`)
+            });
+        },
+        None: () => Result.Err<Activity, string>("The provided activity ID does not exist."),
+    });
+}
+
+
+// Deleting a participant from the data
+$update
+export function removeFromActivity(activityId: string, participantId: string): Result<Activity, string> {
+    return match(activityStorage.get(activityId), {
+        Some: (activity) => {
+            const updateActivity: Activity = {
+                ...activity,
+                participants: activity.participants.filter((participant) => participant.id !== participantId),
+                updatedAt: Opt.Some(ic.time()) ,
+            };
+            activityStorage.insert(activity.id, updateActivity);
+            return Result.Ok<Activity, string>(updateActivity);
+        },
+        None: ()  => Result.Err<Activity, string>("The provided activity id was not found in our records.")
+    });
+}
+
+
+
+// Configuring UUID package
+globalThis.crypto = {
+    // @ts-ignore
+   getRandomValues: () => {
+       let array = new Uint8Array(32)
+
+       for (let i = 0; i < array.length; i++) {
+           array[i] = Math.floor(Math.random() * 256)
+       }
+
+       return array
+   }
+}

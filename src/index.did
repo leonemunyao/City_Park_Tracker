@@ -1,0 +1,37 @@
+type Activity = record {
+  id : text;
+  participants : vec Participant;
+  duration : text;
+  activityType : text;
+  date : text;
+  createdAt : nat64;
+  time : text;
+  description : text;
+  updatedAt : opt nat64;
+};
+type ActivityPayload = record {
+  duration : text;
+  activityType : text;
+  date : text;
+  time : text;
+  description : text;
+};
+type Participant = record { id : text; name : text };
+type _AzleResult = variant { Ok : Activity; Err : text };
+type _AzleResult_1 = variant { Ok : Participant; Err : text };
+type _AzleResult_2 = variant { Ok : vec Activity; Err : text };
+service : () -> {
+  addActivity : (ActivityPayload) -> (_AzleResult);
+  createNewParticipant : (text) -> (_AzleResult_1);
+  deleteActivity : (text) -> (_AzleResult);
+  deleteParticipant : (text) -> (_AzleResult_1);
+  getActivity : (text) -> (_AzleResult) query;
+  getAllActivities : () -> (vec Activity) query;
+  getAllParticipants : () -> (vec Participant) query;
+  getParticipantById : (text) -> (_AzleResult_1) query;
+  insertIntoActivity : (text, text) -> (_AzleResult);
+  removeFromActivity : (text, text) -> (_AzleResult);
+  searchActivity : (text) -> (_AzleResult_2) query;
+  updateActivity : (text, ActivityPayload) -> (_AzleResult);
+  updateExistingParticipant : (text, text) -> (_AzleResult_1);
+}
