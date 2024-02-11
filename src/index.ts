@@ -198,7 +198,7 @@ export  function getAllParticipants(): Vec<Participant> {
 
 // Insert a participant into an activity
 $update
-export function insertIntoActivity(activityId: string, participantId: string): Result<Activity, string> {
+export function insertParticipantIntoActivity(activityId: string, participantId: string): Result<Activity, string> {
     return match(activityStorage.get(activityId), {
         Some: (activity) => {
             return match(participantStorage.get(participantId), {
@@ -221,7 +221,7 @@ export function insertIntoActivity(activityId: string, participantId: string): R
 
 // Deleting a participant from the data
 $update
-export function removeFromActivity(activityId: string, participantId: string): Result<Activity, string> {
+export function removeParticipantFromActivity(activityId: string, participantId: string): Result<Activity, string> {
     return match(activityStorage.get(activityId), {
         Some: (activity) => {
             const updateActivity: Activity = {
