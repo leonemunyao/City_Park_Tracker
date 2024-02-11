@@ -29,8 +29,8 @@ service : () -> {
   getAllActivities : () -> (vec Activity) query;
   getAllParticipants : () -> (vec Participant) query;
   getParticipantById : (text) -> (_AzleResult_1) query;
-  insertIntoActivity : (text, text) -> (_AzleResult);
-  removeFromActivity : (text, text) -> (_AzleResult);
+  insertParticipantIntoActivity : (text, text) -> (_AzleResult);
+  removeParticipantFromActivity : (text, text) -> (_AzleResult);
   searchActivity : (text) -> (_AzleResult_2) query;
   updateActivity : (text, ActivityPayload) -> (_AzleResult);
   updateExistingParticipant : (text, text) -> (_AzleResult_1);
