@@ -1,5 +1,5 @@
 // cannister code goes here
-import { $query, $update, Record, StableBTreeMap, Vec, match, Result, nat64, ic, Opt } from 'azle';
+import { $query, $update, Record, StableBTreeMap, Vec, match, Result, nat64, ic, Opt, Variant, text, Err, Ok } from 'azle';
 import { v4 as uuidv4 } from 'uuid';
 
 
@@ -33,17 +33,41 @@ type ActivityPayload = Record <{
     duration: string;
 }>
 
+const Errors = Variant({
+    InvalidInput: text,
+    RequestCompletionError: text
+});
+type Errors = typeof Errors.tsType;
 
 const activityStorage = new StableBTreeMap <string, Activity>(0, 44, 512);
 const  participantStorage = new StableBTreeMap <string, Participant>(1, 44, 512);
 
+function isValidDate(dateString: string): boolean {
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(dateString)) {
+          return false;
+      }
+    return true;
+}
+
+function isValidDuration(durationString: string): boolean {
+    const duration = parseInt(durationString);
+        if (isNaN(duration) || duration <= 0) {
+            return false;
+        }
+    return true;
+}
 
 // Create a new  activity
 $update
-export function addActivity(payload: ActivityPayload): Result<Activity, string> {
+export function addActivity(payload: ActivityPayload): Result<Activity, Errors> {
     // validate the payload to check if it exists
     if  (!payload.activityType || !payload.description || !payload.date || !payload.time || !payload.duration) {
-        return Result.Err<Activity, string>("Invalid Payload");
+        return Result.Err({InvalidInput: "Invalid Payload"});
+    }
+
+    if (!isValidDate(payload.date) || !isValidDuration(payload.duration)) {
+        return Result.Err({InvalidInput: "Invalid date or duration format."});
     }
     
     try {
@@ -63,46 +87,46 @@ export function addActivity(payload: ActivityPayload): Result<Activity, string> 
         return Result.Ok(newActivity);
         
     } catch (error) {
-        return Result.Err<Activity, string>(`Error while adding activity`);
+        return Result.Err({RequestCompletionError: `Error while adding activity`});
     }
 }
 
 
 // Update already available activity
 $update
-export function updateActivity(id: string, payload: ActivityPayload): Result<Activity, string> {
+export function updateActivity(id: string, payload: ActivityPayload): Result<Activity, Errors> {
     return match(activityStorage.get(id), {
         Some: (activity) => {
             const updateActivity: Activity = {...activity, ...payload, updatedAt: Opt.Some(ic.time())};
             activityStorage.insert(activity.id, updateActivity);
-            return Result.Ok<Activity, string>(updateActivity);
+            return Result.Ok(updateActivity);
         },
-        None: () => Result.Err<Activity, string>(`No such activity found with given Id ${id}`),
+        None: () => Result.Err({RequestCompletionError: `No such activity found with given Id ${id}`}),
     });
 }
 
 
 //  Delete the activity from storage
 $update
-export function deleteActivity(id: string): Result<Activity, string>{
+export function deleteActivity(id: string): Result<Activity, Errors>{
     return  match(activityStorage.get(id), {
         Some: (activity) => {
             activityStorage.remove(id);
-            return Result.Ok<Activity, string>(activity);
+            return Result.Ok(activity);
         },
-        None: ()=>Result.Err<Activity, string>(`There is no activity with id :${id}`),
+        None: ()=>Result.Err({RequestCompletionError: `There is no activity with id :${id}`}),
     });
 }
 
 
 //  Get all activities or get a specific activity by its id
 $query
-export function getActivity(id: string): Result<Activity, string>{
+export function getActivity(id: string): Result<Activity, Errors>{
     return match(activityStorage.get(id), {
         Some: (goal) => {
-            return Result.Ok<Activity, string>(goal);
+            return Result.Ok(goal);
         },
-        None: ( )=> Result.Err<Activity, string>(`No Activities Found with id :${id}`),
+        None: ( )=> Result.Err({RequestCompletionError: `No Activities Found with id :${id}`}),
     });
 }
 
@@ -117,26 +141,26 @@ export function  getAllActivities(): Vec<Activity> {
 
 // Search the activity by tittle
 $query
-export function searchActivity(type: string): Result<Vec<Activity>, string> {
+export function searchActivity(type: string): Result<Vec<Activity>, Errors> {
     const  filteredActvities = type.toLowerCase();
     try {
         const  foundActivity = activityStorage.values().filter(
             (activity) =>
             activity.activityType.toLowerCase().includes(filteredActvities)
             );
-            return Result.Ok<Vec<Activity>, string>(foundActivity); 
+            return Result.Ok(foundActivity); 
     }
     catch (err){
-       return Result.Err("Error while searching for this Activity");
+       return Result.Err({RequestCompletionError: "Error while searching for this Activity"});
     };
 }
 
 
 // Create the new participant
 $update
-export function createNewParticipant(name: string): Result<Participant, string> {
+export function createNewParticipant(name: string): Result<Participant, Errors> {
     if (!name) {
-        return Result.Err<Participant, string>('Name cannot be empty');
+        return Result.Err({InvalidInput: 'Name cannot be empty'});
     }
     try {
         const newParticipant: Participant = {
@@ -144,47 +168,47 @@ export function createNewParticipant(name: string): Result<Participant, string> 
             name: name,
         }
         participantStorage.insert(newParticipant.id, newParticipant);
-        return Result.Ok<Participant, string>(newParticipant);
+        return Result.Ok(newParticipant);
     } catch (err) {
-        return Result.Err<Participant, string>(`Failed to create a new participant: ${err}`);
+        return Result.Err({RequestCompletionError: `Failed to create a new participant: ${err}`});
     }
 }
 
 
 // Updating an Existing Participant
 $update
-export function updateExistingParticipant(id: string, name: string): Result<Participant,string> {
+export function updateExistingParticipant(id: string, name: string): Result<Participant,Errors> {
     return match(participantStorage.get(id), {
         Some: (participant) => {
             const  updatedParticipant: Participant = {...participant, name};
             participantStorage.insert(participant.id, updatedParticipant);
-            return Result.Ok<Participant, string>(updatedParticipant)
+            return Result.Ok(updatedParticipant)
         },
-        None: ()=> Result.Err<Participant, string>(`No participant with ID "${id}" exists.`),
+        None: ()=> Result.Err({RequestCompletionError: `No participant with ID "${id}" exists.`}),
     });
 }
 
 
 // Delete an existing particpant
 $update
-export function deleteParticipant(id: string): Result<Participant, string> {
+export function deleteParticipant(id: string): Result<Participant, Errors> {
     return match(participantStorage.get(id),{
         Some: (participant) => {
             participantStorage.remove(id);
-            return Result.Ok<Participant, string>(participant)
+            return Result.Ok<Participant, Errors>(participant)
         },
-        None: () => Result.Err<Participant, string>(`Unable to find participant with ID "${id}".`),
+        None: () => Result.Err<Participant, Errors>({RequestCompletionError: `Unable to find participant with ID "${id}".`}),
     });
 }   
 
 // Get a participant by id
 $query
-export function getParticipantById(id: string): Result<Participant, string> {
+export function getParticipantById(id: string): Result<Participant, Errors> {
     return match(participantStorage.get(id), {
         Some: (participant) => {
-            return Result.Ok<Participant, string>(participant)
+            return Result.Ok<Participant, Errors>(participant)
         },
-        None: () => Result.Err<Participant, string>("The requested participant does not exist."),
+        None: () => Result.Err<Participant, Errors>({RequestCompletionError: "The requested participant does not exist."}),
     });
 }
 
@@ -198,7 +222,7 @@ export  function getAllParticipants(): Vec<Participant> {
 
 // Insert a participant into an activity
 $update
-export function insertParticipantIntoActivity(activityId: string, participantId: string): Result<Activity, string> {
+export function insertParticipantIntoActivity(activityId: string, participantId: string): Result<Activity, Errors> {
     return match(activityStorage.get(activityId), {
         Some: (activity) => {
             return match(participantStorage.get(participantId), {
@@ -209,19 +233,19 @@ export function insertParticipantIntoActivity(activityId: string, participantId:
                         updatedAt: Opt.Some(ic.time()),
                     };
                     activityStorage.insert(activity.id, updateActivity);
-                    return Result.Ok<Activity, string>(updateActivity);
+                    return Result.Ok<Activity, Errors>(updateActivity);
                 },
-                None: () => Result.Err<Activity, string>(`No participant found with the id "${participantId}"`)
+                None: () => Result.Err<Activity, Errors>({RequestCompletionError: `No participant found with the id "${participantId}"`})
             });
         },
-        None: () => Result.Err<Activity, string>("The provided activity ID does not exist."),
+        None: () => Result.Err<Activity, Errors>({RequestCompletionError: "The provided activity ID does not exist."}),
     });
 }
 
 
 // Deleting a participant from the data
 $update
-export function removeParticipantFromActivity(activityId: string, participantId: string): Result<Activity, string> {
+export function removeParticipantFromActivity(activityId: string, participantId: string): Result<Activity, Errors> {
     return match(activityStorage.get(activityId), {
         Some: (activity) => {
             const updateActivity: Activity = {
@@ -230,9 +254,9 @@ export function removeParticipantFromActivity(activityId: string, participantId:
                 updatedAt: Opt.Some(ic.time()) ,
             };
             activityStorage.insert(activity.id, updateActivity);
-            return Result.Ok<Activity, string>(updateActivity);
+            return Result.Ok<Activity, Errors>(updateActivity);
         },
-        None: ()  => Result.Err<Activity, string>("The provided activity id was not found in our records.")
+        None: ()  => Result.Err<Activity, Errors>({RequestCompletionError: "The provided activity id was not found in our records."})
     });
 }
 
